@@ -34,6 +34,7 @@
     
     <div id="statusMessage"></div>
     <div id="result"></div>
+    <div id="shoppingList"></div>
 
     <script>
         const apiKey = "AIzaSyB6enIU2iHdn5RPwabaQAKv_vOzFLZ_RAs";
@@ -44,6 +45,7 @@
         const generateButton = document.getElementById('generateButton');
         const statusMessage = document.getElementById('statusMessage');
         const resultDiv = document.getElementById('result');
+        const shoppingListDiv = document.getElementById('shoppingList');
 
         generateButton.addEventListener('click', async () => {
             if (!apiKey) {
@@ -54,12 +56,14 @@
             const goal = goalInput.value;
             const preferences = preferencesInput.value;
             const restrictions = restrictionsInput.value;
-            const prompt = `Crea un piano alimentare giornaliero personalizzato. Obiettivo: ${goal}. Preferenze: ${preferences}. Restrizioni: ${restrictions}. Formatta la risposta in modo chiaro e leggibile.`;
+            // Modificato il prompt per richiedere esplicitamente la lista della spesa
+            const prompt = `Crea un piano alimentare giornaliero personalizzato. Obiettivo: ${goal}. Preferenze: ${preferences}. Restrizioni: ${restrictions}. Alla fine del piano, includi una sezione intitolata "Lista della Spesa:" seguita dagli ingredienti necessari, uno per riga. Formatta il piano in modo chiaro e leggibile.`;
 
             generateButton.innerHTML = 'Generazione in corso...';
             generateButton.disabled = true;
             statusMessage.innerHTML = '';
             resultDiv.innerHTML = '';
+            shoppingListDiv.innerHTML = ''; // Pulisce la lista della spesa precedente
 
             try {
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
@@ -79,7 +83,8 @@
                 const data = await response.json();
                 const generatedText = data.candidates[0].content.parts[0].text;
                 
-                resultDiv.innerHTML = `<h2>Il Tuo Piano Alimentare</h2><p>${generatedText}</p>`;
+                // Estrae e visualizza la lista della spesa
+                extractAndDisplayShoppingList(generatedText);
 
             } catch (err) {
                 console.error(err);
@@ -89,6 +94,34 @@
                 generateButton.disabled = false;
             }
         });
+
+        function extractAndDisplayShoppingList(fullText) {
+            // Cerca la sezione della lista della spesa usando una Regular Expression
+            const shoppingListRegex = /Lista della Spesa:(.*)/s;
+            const match = fullText.match(shoppingListRegex);
+
+            if (match && match[1]) {
+                // Se la lista è trovata
+                const shoppingListContent = match[1].trim();
+                const items = shoppingListContent.split('\n').filter(item => item.trim() !== '');
+                
+                let listHtml = '<h2>Lista della Spesa</h2><ul>';
+                items.forEach(item => {
+                    listHtml += `<li>${item.replace(/^- /, '').replace(/^\* /, '')}</li>`; // Rimuove eventuali trattini o asterischi
+                });
+                listHtml += '</ul>';
+                
+                shoppingListDiv.innerHTML = listHtml;
+                
+                // Rimuove la lista della spesa dal testo del piano alimentare per evitare duplicati
+                const mealPlanText = fullText.replace(shoppingListRegex, '').trim();
+                resultDiv.innerHTML = `<h2>Il Tuo Piano Alimentare</h2><p>${mealPlanText}</p>`;
+            } else {
+                // Se la lista non è trovata, visualizza tutto il testo come piano alimentare
+                resultDiv.innerHTML = `<h2>Il Tuo Piano Alimentare</h2><p>${fullText}</p>`;
+                shoppingListDiv.innerHTML = '<p>La lista della spesa non è stata generata. Riprova.</p>';
+            }
+        }
     </script>
 </body>
 </html>
